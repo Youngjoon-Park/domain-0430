@@ -100,5 +100,96 @@ sudo java -jar kiosk-backend-0.0.1-SNAPSHOT.jar
 
 ---
 
-위 내용을 README.md로 저장하여 프로젝트 내 공유하는 것을 추천합니다.
+
+# 📄 README: Nginx 정적 파일 퍼미션 오류 해결 및 배포 절차
+
+## 📌 상황 개요
+
+배포용으로 React(Vite) 프론트엔드를 빌드하고,  
+아래 명령어로 서버(Lightsail 등)에 업로드할 때 다음과 같은 오류가 발생했습니다.
+
+```bash
+scp -i /c/kiosk-project/kiosk-backend/pem/LightsailDefaultKey-ap-northeast-2.pem -r dist/* ubuntu@3.38.6.220:/home/ubuntu/kiosk-frontend/
+```
+
+**오류 내용:**
+
+```bash
+scp: dest open "/home/ubuntu/kiosk-frontend/index.html": Permission denied
+scp: failed to upload file dist/index.html to /home/ubuntu/kiosk-frontend/
+```
+
+---
+
+## 1️⃣ 원인 분석
+
+- `/home/ubuntu/kiosk-frontend` 디렉토리 또는 하위 `assets/` 폴더에 대해
+  소유권(ownership)이 `ubuntu` 사용자가 아닌 **root 또는 다른 사용자**로 설정되어 있었음.
+
+---
+
+## 2️⃣ 해결 방법 (모카 서버에서 실행)
+
+```bash
+# ✅ 모카 서버에 SSH 접속
+ssh -i /path/to/your.pem ubuntu@3.38.6.220
+
+# ✅ 권한(소유자) 변경
+sudo chown -R ubuntu:ubuntu /home/ubuntu/kiosk-frontend
+```
+
+### 🔍 이 명령의 의미
+
+| 명령어 | 설명 |
+|--------|------|
+| `sudo` | 관리자 권한으로 실행 |
+| `chown` | 소유자 변경 |
+| `-R` | 하위 디렉토리까지 재귀적으로 적용 |
+| `ubuntu:ubuntu` | 사용자:그룹 |
+| `/home/ubuntu/kiosk-frontend` | 소유권을 변경할 대상 디렉토리 |
+
+---
+
+## 3️⃣ 배포 순서 (정리)
+
+### ✅ A. 로컬 VSCode (Windows Git Bash)
+
+```bash
+# Vite 프로젝트 빌드
+npm run build
+```
+
+```bash
+# 빌드된 정적 파일을 서버로 복사
+scp -i /c/kiosk-project/kiosk-backend/pem/LightsailDefaultKey-ap-northeast-2.pem -r dist/* ubuntu@3.38.6.220:/home/ubuntu/kiosk-frontend/
+```
+
+- 만약 다시 `Permission denied` 발생 시 → SSH 접속 후 `chown` 한 번 더!
+
+---
+
+### ✅ B. 모카 서버 (Lightsail)
+
+```bash
+# 권한 오류 있을 경우에만!
+sudo chown -R ubuntu:ubuntu /home/ubuntu/kiosk-frontend
+
+# nginx 설정 변경 시:
+sudo systemctl reload nginx
+```
+
+---
+
+### ✅ C. GitHub에서 할 일은 없음
+
+- 이 작업은 **배포 서버와 로컬 빌드 파일 간의 복사**에 해당.
+- Git에는 권한 문제가 발생하지 않음 (코드 자체에는 영향 없음)
+
+---
+
+## 📎 추가 팁
+
+- `/home/ubuntu/kiosk-frontend/` 경로는 nginx에서 `/`로 매핑되는 정적 파일 루트입니다.
+- `index.html`, `vite.svg`, `assets/*`가 이 위치에 정확히 복사되어야 정상 동작합니다.
+
 
