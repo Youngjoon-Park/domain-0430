@@ -357,6 +357,136 @@ java -jar /home/ubuntu/kiosk-system/kiosk-backend-0.0.1-SNAPSHOT.jar
 | 편집기 사용 | `:wq`, `:q!`, `i` | vim 저장 및 종료 방법 |
 
 ---
+# 💡 Kiosk 프로젝트 배포 가이드 (MobaXterm + Lightsail + React + Spring Boot + NGINX)
+
+---
+
+## ✅ 1. AWS Lightsail 인스턴스 접속을 위한 준비
+
+### 🔹 PEM 키 준비 (한 번만 필요)
+1. Lightsail > 계정 > SSH 키 다운로드 (예: `LightsailDefaultKey-ap-northeast-2.pem`)
+2. VSCode 또는 Git Bash 기준으로 다음 경로에 저장:  
+   `C:\kiosk-project\kiosk-backend\pem\LightsailDefaultKey-ap-northeast-2.pem`
+
+### 🔹 권한 설정 (윈도우에서 Git Bash 기준)
+```bash
+chmod 400 /c/kiosk-project/kiosk-backend/pem/LightsailDefaultKey-ap-northeast-2.pem
+```
+
+---
+
+## ✅ 2. MobaXterm 세션 만들기 (3개)
+
+| 세션 이름 | 역할 | 포트 | 사용 목적 |
+|-----------|------|------|------------|
+| backend   | Spring Boot 서버 | 8081 | jar 실행 |
+| frontend  | React + Nginx 배포 디렉토리 | 80 | 정적파일 복사 + 권한 |
+| mysql     | MySQL 접속 | 3306 | DB 확인 및 SQL |
+
+> 각 세션은 동일한 IP (`3.38.6.220` 등)으로 접속하며, `pem` 키로 인증합니다.
+
+---
+
+## ✅ 3. React 프로젝트 배포 준비
+
+### 🔹 빌드 실행 (로컬 VS Code)
+```bash
+cd /c/kiosk-project/kiosk-frontend
+npm run build
+```
+- `dist/` 폴더 생성됨
+
+### 🔹 기존 서버 폴더 삭제 (서버에서)
+```bash
+rm -rf /home/ubuntu/kiosk-frontend/*
+```
+> 이유: 덮어쓰기시 오류 발생 가능, 퍼미션 문제 방지
+
+### 🔹 복사 (로컬에서 실행)
+```bash
+scp -i /c/kiosk-project/kiosk-backend/pem/LightsailDefaultKey-ap-northeast-2.pem -r dist/* ubuntu@3.38.6.220:/home/ubuntu/kiosk-frontend/
+```
+
+### 🔹 퍼미션 문제 해결 (서버에서 실행)
+```bash
+sudo chown -R ubuntu:ubuntu /home/ubuntu/kiosk-frontend
+```
+
+---
+
+## ✅ 4. NGINX 설정 확인
+
+### 🔹 설정파일 열기
+```bash
+sudo nano /etc/nginx/sites-available/default
+```
+
+### 🔹 root 경로 설정
+```nginx
+server {
+    listen 80;
+    server_name kiosktest.shop;
+
+    root /home/ubuntu/kiosk-frontend;
+    index index.html;
+
+    location / {
+        try_files $uri /index.html;
+    }
+
+    location /api/ {
+        proxy_pass http://localhost:8081;
+    }
+}
+```
+
+### 🔹 설정 적용
+```bash
+sudo systemctl restart nginx
+```
+
+---
+
+## ✅ 5. Spring Boot JAR 실행
+
+### 🔹 실행 명령
+```bash
+cd /home/ubuntu/kiosk-system
+java -jar kiosk-backend-0.0.1-SNAPSHOT.jar
+```
+
+> `.jar` 파일이 존재하지 않으면 로컬에서 `build/libs/*.jar` 복사
+```bash
+scp -i /c/kiosk-project/kiosk-backend/pem/LightsailDefaultKey-ap-northeast-2.pem build/libs/*.jar ubuntu@3.38.6.220:/home/ubuntu/kiosk-system/
+```
+
+---
+
+## ✅ 6. 편집기 사용법 (nano 기준)
+
+- 저장: `Ctrl + O` → 엔터
+- 종료: `Ctrl + X`
+
+---
+
+## ✅ 추가 팁
+
+- ⚠️ 반드시 React 프로젝트를 `npm run build` 하고 `dist/*` 전체를 복사
+- ⚠️ 퍼미션 문제 발생 시 `sudo chown -R ubuntu:ubuntu` 명령 필수
+- ⚠️ jar 파일 실행 시 포트 충돌 주의 → 이미 실행된 경우 `ps -ef | grep java` 후 kill
+
+---
+
+🧩 전체 배포 흐름:
+1. 프론트 빌드
+2. 서버 파일 삭제
+3. React 정적 파일 복사 (scp)
+4. 퍼미션 수정
+5. nginx 확인 및 재시작
+6. 백엔드 jar 실행
+
+
+
 
 
 
