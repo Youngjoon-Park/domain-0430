@@ -485,6 +485,106 @@ scp -i /c/kiosk-project/kiosk-backend/pem/LightsailDefaultKey-ap-northeast-2.pem
 5. nginx 확인 및 재시작
 6. 백엔드 jar 실행
 
+# 🚀 Kiosk 프로젝트 배포 매뉴얼 (프론트엔드 + 백엔드)
+
+## ✅ 1. 프론트엔드 배포 (React + Vite)
+
+### 1-1. 프론트엔드 빌드
+```bash
+npm run build
+```
+- `/dist` 폴더가 생성됨
+
+### 1-2. 서버에 빌드 결과물 전송 (bash에서 scp 사용)
+```bash
+scp -i /c/kiosk-project/kiosk-backend/pem/LightsailDefaultKey-ap-northeast-2.pem -r dist/* ubuntu@3.38.6.220:/home/ubuntu/kiosk-frontend/
+```
+- ⚠️ 기존 `kiosk-frontend` 폴더 안 내용 삭제 후 업로드 권장:
+```bash
+ssh -i [pem] ubuntu@[ip]
+sudo rm -rf /home/ubuntu/kiosk-frontend/*
+```
+
+### 1-3. 권한 오류 발생 시 해결
+```bash
+sudo chown -R ubuntu:ubuntu /home/ubuntu/kiosk-frontend
+```
+
+### 1-4. Nginx 재시작
+```bash
+sudo systemctl restart nginx
+```
+- Nginx 설정 파일 위치 확인:
+```bash
+/etc/nginx/sites-available/default
+```
+- `root /home/ubuntu/kiosk-frontend;`로 설정되어 있어야 함
+
+---
+
+## ✅ 2. 백엔드 배포 (Spring Boot)
+
+### 2-1. 빌드 (로컬)
+```bash
+./gradlew clean build
+```
+- 생성 파일: `build/libs/kiosk-backend-0.0.1-SNAPSHOT.jar`
+
+### 2-2. 서버 전송 (VSCode 또는 모카 접속 후 드래그 앤 드롭)
+- `lib` 폴더에서 `.jar` 파일 선택 후 → 서버 세션의 `/home/ubuntu/kiosk-system/`으로 드래그하여 업로드
+
+### 2-3. 실행
+```bash
+cd /home/ubuntu/kiosk-system
+java -jar kiosk-backend-0.0.1-SNAPSHOT.jar
+```
+
+### 2-4. 실행 중 로그 확인
+- 정상 로그: `Tomcat started on port(s): 8081`
+- 오류 시: 설정 파일(`application.properties`) 경로, DB, WebClient 설정 확인
+
+---
+
+## ✅ 참고
+
+### 🧪 테스트용 카카오페이 우회 처리
+- `application.properties` 또는 `.yml`에서 `localhost` 리디렉션 사용:
+```properties
+kakao.host=http://localhost:5173
+kakao.approve-url=${kakao.host}/payment/success
+```
+- 프론트에서 테스트용 버튼 추가:
+```jsx
+<button onClick={() => navigate(`/payment/success?pg_token=FAKE&orderId=1`)}>테스트 결제</button>
+```
+
+### ✏️ 편집기 단축키 (nano)
+- 열기: `nano 파일명`
+- 저장: `Ctrl + O`
+- 종료: `Ctrl + X`
+
+### 🧩 세션 분할 예시 (모카)
+1. 첫 번째 터미널: 백엔드 실행
+2. 두 번째 터미널: 프론트 배포 상태 확인
+3. 세 번째 터미널: MySQL 접속 또는 로그 확인
+
+```bash
+mysql -u admin_user -p
+```
+
+---
+
+## 📝 마무리 요약
+| 작업 구분 | 도구/위치 | 명령어 또는 방법 |
+|-----------|-----------|------------------|
+| 프론트 빌드 | VSCode 로컬 | `npm run build` |
+| 프론트 업로드 | Git Bash 또는 MobaXterm | `scp -i ...` 또는 드래그 업로드 |
+| 프론트 권한 | 서버 | `sudo chown -R` |
+| 백엔드 빌드 | 로컬 Gradle | `./gradlew build` |
+| 백엔드 업로드 | MobaXterm 파일 탭 | `.jar` 드래그 앤 드롭 |
+| 백엔드 실행 | 서버 세션 | `java -jar ...` |
+| Nginx 적용 | 서버 | `sudo systemctl restart nginx` |
+
 
 
 
