@@ -251,4 +251,112 @@ scp -i /c/kiosk-project/kiosk-backend/pem/LightsailDefaultKey-ap-northeast-2.pem
 
 완료되면 브라우저 새로고침 또는 강제 새로고침(Ctrl + F5) 해주세요.
 
+# 🧾 Kiosk 프로젝트 배포 리드미 (React + Nginx + Spring Boot JAR)
+
+---
+
+## ✅ PART 1: Nginx 설정 개요
+
+- 설정 파일: `/etc/nginx/sites-available/default`
+
+```nginx
+server {
+    listen 80;
+    server_name kiosktest.shop;
+
+    root /home/ubuntu/kiosk-frontend;
+    index index.html;
+
+    location / {
+        try_files $uri /index.html;
+    }
+
+    location /api {
+        proxy_pass http://localhost:8081;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+    }
+}
+```
+
+- 🔥 `root` 경로는 React 정적 파일이 위치한 폴더와 반드시 일치해야 합니다.
+
+---
+
+## ✅ PART 2: React 배포 절차
+
+1. 로컬에서 빌드:
+```bash
+npm run build
+```
+
+2. 기존 서버 폴더 삭제 (권한 에러 방지):
+```bash
+ssh ubuntu@서버IP
+sudo rm -rf /home/ubuntu/kiosk-frontend/*
+```
+
+3. 로컬에서 파일 전송:
+```bash
+scp -i [키파일.pem] -r dist/* ubuntu@서버IP:/home/ubuntu/kiosk-frontend/
+```
+
+4. 권한 재설정:
+```bash
+ssh ubuntu@서버IP
+sudo chown -R ubuntu:ubuntu /home/ubuntu/kiosk-frontend
+```
+
+5. Nginx 재시작:
+```bash
+sudo systemctl restart nginx
+```
+
+---
+
+## ✅ PART 3: 백엔드 JAR 실행
+
+1. 백엔드 빌드:
+```bash
+./gradlew clean build
+```
+
+2. 서버에서 JAR 실행:
+```bash
+java -jar /home/ubuntu/kiosk-system/kiosk-backend-0.0.1-SNAPSHOT.jar
+```
+
+> 이때 React는 따로 Nginx가 서빙하므로 JAR에 포함시키지 않아도 됩니다.
+
+---
+
+## ✅ PART 4: 편집기(Vim) 기본 명령어
+
+파일 수정 시 실수 방지를 위해 꼭 기억:
+
+- **수정 시작:** `i` (insert mode)
+- **저장 후 종료:** `Esc` → `:wq` → `Enter`
+- **저장 없이 종료:** `Esc` → `:q!` → `Enter`
+- **저장만:** `Esc` → `:w` → `Enter`
+
+> 💡 명령어는 항상 `Esc`로 빠져나온 후 입력해야 작동합니다.
+
+---
+
+## ✅ 정리 요약
+
+| 목적 | 명령어/설정 | 설명 |
+|------|--------------|------|
+| React 배포 | `npm run build` + `scp` | 정적 자산을 서버에 업로드 |
+| 권한 설정 | `sudo chown -R ubuntu:ubuntu` | scp 권한 문제 방지 |
+| 백엔드 실행 | `java -jar ...` | Spring Boot API 서버 기동 |
+| Nginx 적용 | `sudo systemctl restart nginx` | root/경로 변경 반영 |
+| 편집기 사용 | `:wq`, `:q!`, `i` | vim 저장 및 종료 방법 |
+
+---
+
+
 
