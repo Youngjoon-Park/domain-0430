@@ -192,4 +192,63 @@ sudo systemctl reload nginx
 - `/home/ubuntu/kiosk-frontend/` 경로는 nginx에서 `/`로 매핑되는 정적 파일 루트입니다.
 - `index.html`, `vite.svg`, `assets/*`가 이 위치에 정확히 복사되어야 정상 동작합니다.
 
+- # 💻 프론트엔드 SCSS 배포 전 기존 폴더 삭제 이유 및 방법
+
+## ✅ 왜 기존 폴더를 삭제해야 하나요?
+
+1. **캐싱/충돌 방지**  
+   Vite로 빌드하면 파일 이름이 `index-XXXXXXX.js`처럼 해시 기반으로 계속 바뀝니다.  
+   이전 빌드 파일이 남아 있으면 Nginx가 잘못된 JS/CSS를 서빙할 수 있습니다.
+
+2. **용량 증가**  
+   쓸모없는 오래된 파일이 `/home/ubuntu/kiosk-frontend/assets` 아래에 누적됩니다.
+
+3. **배포 누락 위험**  
+   새로 만든 파일만 덮어쓰기되기 때문에  
+   **삭제된 파일이 서버에는 여전히 남아 있는 상태가 됩니다.**  
+   → 에러 발생 가능성 높음!
+
+---
+
+## 🧼 기존 프론트엔드 폴더 삭제 명령어
+
+```bash
+# 💥 기존 프론트엔드 파일 전체 삭제
+rm -rf /home/ubuntu/kiosk-frontend/*
+```
+
+> 주의: `*` 는 내부 파일만 삭제합니다. `/kiosk-frontend/` 폴더 자체는 유지됨
+
+---
+
+## 📂 새 dist 폴더 복사 (로컬 → 서버)
+
+```bash
+# 로컬 PC (Git Bash or MobaXterm)
+scp -i /c/kiosk-project/kiosk-backend/pem/LightsailDefaultKey-ap-northeast-2.pem -r dist/* ubuntu@3.38.6.220:/home/ubuntu/kiosk-frontend/
+```
+
+> `dist/*` 를 통해 빌드된 모든 파일을 서버로 복사합니다.
+
+---
+
+## 🔁 순서 정리 (배포 전체 흐름)
+
+1. VSCode에서 `npm run build` 
+2. Git Bash에서 서버 폴더 비우기:
+   ```bash
+   ssh -i ... ubuntu@3.38.6.220
+   sudo rm -rf /home/ubuntu/kiosk-frontend/*
+   ```
+3. 다시 로컬에서 dist 복사:
+   ```bash
+   scp -i ... -r dist/* ubuntu@3.38.6.220:/home/ubuntu/kiosk-frontend/
+   ```
+4. 서버에서 Nginx 재시작:
+   ```bash
+   sudo systemctl reload nginx
+   ```
+
+완료되면 브라우저 새로고침 또는 강제 새로고침(Ctrl + F5) 해주세요.
+
 
